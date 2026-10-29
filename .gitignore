@@ -1,0 +1,32 @@
+# Godot
+.godot/
+*.translation
+
+# Build outputs
+build/
+*.apk
+*.aab
+*.idsig
+*.pck
+*.zip
+
+# Signing secrets — never commit
+*.keystore
+*.jks
+export_presets.cfg
+
+# Local/OS noise
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Internal tests/temp (not part of the public source tree)
+tests/
+_tmp_verify/
+_tmp_backup_m0/
+_tmp_netspike/
+_incoming/
+docs/*.md
+docs/screenshots/*.import
