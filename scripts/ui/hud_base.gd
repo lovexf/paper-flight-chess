@@ -1058,11 +1058,18 @@ func hud_error_show(title: String, sub: String, retry := Callable()) -> void:
 	hd_error_retry = retry
 	queue_redraw()
 
-## 传送门是否处于「选目标格」状态（读 st.pendingItem，不依赖 flow 函数）
+## 是否为本机玩家（本地多人=当前真人；联机=自己的座位）
+func _hd_is_local_actor(pid: int) -> bool:
+	if net_ui_active:
+		return pid == int(net_local_seat)
+	return humans.has(pid)
+
+## 传送门是否处于本机玩家的「选目标格」状态（AI/其他玩家的 pendingItem 不弹 UI）
 func _hd_teleport_pending() -> bool:
 	if not bool(st.get("skillMode", false)): return false
 	var pend = st.get("pendingItem", null)
-	return pend != null and str(pend.item) == "teleport"
+	if pend == null or str(pend.item) != "teleport": return false
+	return _hd_is_local_actor(int(pend.get("player", 0)))
 
 ## 是否有第二批弹层需要优先消费点击（给 flow_base._input 调用）
 func hud_modal_active() -> bool:
@@ -1170,7 +1177,7 @@ func _hd_observe() -> void:
 	# ② 多面骰结果（last_dice 1-12，只有人类能买道具）
 	if last_dice != hd_last_dice_seen:
 		hd_last_dice_seen = last_dice
-		if last_dice > 6 and (humans.has(last_dice_owner) or last_dice_owner == int(net_local_seat)):
+		if last_dice > 6 and _hd_is_local_actor(last_dice_owner):
 			hd_poly_value = last_dice
 			hd_dialog = "poly"
 			queue_redraw()
@@ -1189,6 +1196,7 @@ func _hd_observe() -> void:
 					break
 			if num == "": continue
 			var owner := int(e.get("p", int(st.get("currentPlayer", 1))))
+			if not _hd_is_local_actor(owner): continue
 			var reward := int(num)
 			var after := int(st.energy.get(owner, 0))
 			var cost := int(E.ITEM_COSTS.get("mysteryBox", 15))
@@ -1198,14 +1206,16 @@ func _hd_observe() -> void:
 			hd_dialog = "mystery"
 			queue_redraw()
 		hd_log_seen = log_lines.size()
-	# ④ 传送门：买完先弹 02c 使用确认，确认后进入 02g 选格
+	# ④ 传送门：购买后直接进入 02g 选格，去掉多余的「使用确认」二次弹框
 	if _hd_teleport_pending():
 		if hd_dialog == "" and not hd_tele_ready:
-			hd_dialog = "use_teleport"
-			hd_dlg_item = "teleport"
+			hd_tele_ready = true
 			queue_redraw()
 	elif hd_tele_ready:
 		hd_tele_ready = false
+	# 清理旧版/切换玩家后残留的传送门使用确认弹层
+	if hd_dialog == "use_teleport" and not _hd_teleport_pending():
+		hd_dialog = ""
 	# ⑤ 积分不足 / 时机错误 toast：跟随 item_fx 的 deny 反馈
 	for iid in hd_deny_seen.keys():
 		if not item_fx.has(iid): hd_deny_seen.erase(iid)
