@@ -477,6 +477,7 @@ func _draw_hud_log_strip(font: Font) -> void:
 
 # ---------------------------------------------------------------- 骰子行 + 大号「掷骰子」按钮
 func _hud_dice_hint() -> String:
+	if not settings_hints: return ""
 	if st.get("winner") != null: return "本局已结束，点棋盘查看结算"
 	if _hud_pause_active(): return "本局已暂停"
 	if dice_anim > 0.0: return "摇骰中…"

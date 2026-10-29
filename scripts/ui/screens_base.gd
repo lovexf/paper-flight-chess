@@ -1398,8 +1398,76 @@ enum Scr { MODE, SETUP, PLAY, NET }  # NET 只追加在最后（tests/test_anim.
 var seq: Array = []           # 动画段队列（同组并行、组间串行）
 var cur_grp := 0              # 当前动画组号
 
-# ---- 音效（全链共享）----
+# ---- 音效/音乐/震动（全链共享）----
+var bgm_player: AudioStreamPlayer = null
+
+func _settings_anim_scale() -> float:
+	return [0.5, 1.0, 1.5][clampi(settings_anim, 0, 2)]
+
+func _settings_ensure_bgm() -> void:
+	if bgm_player != null:
+		return
+	var stream = load("res://assets/from_project/audio/bgm.wav")
+	if stream == null:
+		return
+	if stream is AudioStreamWAV:
+		var wav := stream as AudioStreamWAV
+		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		wav.loop_begin = 0
+		wav.loop_end = int(wav.get_length() * wav.mix_rate)
+	bgm_player = AudioStreamPlayer.new()
+	bgm_player.stream = stream
+	bgm_player.volume_db = -12.0
+	add_child(bgm_player)
+	bgm_player.play()
+
+func _settings_apply() -> void:
+	# 音效开关：关闭时直接跳过播放，避免白白占用 AudioStreamPlayer
+	for nm in sfx.keys():
+		var p: AudioStreamPlayer = sfx[nm]
+		if p != null:
+			p.volume_db = 0.0 if settings_sound else -80.0
+	# 背景音乐：0 时停止，非 0 时按 0..100 映射音量并保持循环
+	_settings_ensure_bgm()
+	if bgm_player != null:
+		var target_db: float = -80.0 if settings_music <= 0 else linear_to_db(float(settings_music) / 100.0) - 9.0
+		bgm_player.volume_db = target_db
+		if settings_music > 0:
+			if not bgm_player.playing: bgm_player.play()
+		else:
+			bgm_player.stop()
+	# 减少动态效果：隐藏已有粒子（particle_layer 在 render_base 中声明，父类用 get 访问）
+	var pl = get("particle_layer")
+	if pl != null and settings_reduce_motion:
+		pl.visible = false
+
+func _vibrate_for(nm: String) -> void:
+	if settings_vibrate <= 0 or not OS.has_feature("mobile"):
+		return
+	# 只对本地玩家操作反馈，AI/其他玩家的动作不震
+	var cur := int(st.get("currentPlayer", 0))
+	if cur <= 0:
+		return
+	var hs = get("humans")
+	if hs == null:
+		return
+	var net_active: bool = bool(get("net_ui_active"))
+	var local: bool = (cur == int(get("net_local_seat"))) if net_active else (hs as Array).has(cur)
+	if not local:
+		return
+	var ms: int = {
+		"move": 10, "fly": 18, "finish": 40, "beat": 32,
+		"rolling": 18, "shake": 25, "skill": 18, "gameover": 55,
+	}.get(nm, 0)
+	ms = int(float(ms) * (0.45 if settings_vibrate == 1 else (1.0 if settings_vibrate == 2 else 1.5)))
+	if ms > 0:
+		Input.vibrate_handheld(ms)
+
 func _sfx(nm: String) -> void:
+	# 音效和震动是独立开关：静音时仍然可以保留震动反馈
+	_vibrate_for(nm)
+	if not settings_sound:
+		return
 	if sfx.has(nm):
 		var p: AudioStreamPlayer = sfx[nm]
 		p.play()
@@ -1476,6 +1544,7 @@ func _settings_load() -> void:
 	settings_reduce_motion = bool(d.get("reduce_motion", settings_reduce_motion))
 	settings_hints = bool(d.get("hints", settings_hints))
 	settings_cache_mb = float(d.get("cache_mb", settings_cache_mb))
+	_settings_apply()
 
 func _settings_save() -> void:
 	var f := FileAccess.open(SETTINGS_PATH, FileAccess.WRITE)
@@ -1486,6 +1555,7 @@ func _settings_save() -> void:
 		"hints": settings_hints, "cache_mb": settings_cache_mb,
 	}))
 	f.close()
+	_settings_apply()
 
 func _settings_reset_default() -> void:
 	settings_sound = true

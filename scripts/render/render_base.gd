@@ -343,6 +343,8 @@ var log_lines: Array = []
 
 # ---- 能量粒子生成（动画段开播时触发）----
 func _spawn_energy_particles(from: Vector2, to_player: int, amount: int) -> void:
+	if settings_reduce_motion:
+		return
 	var bar := energy_bar_rect(to_player)
 	var tgt := bar.position + bar.size * 0.5
 	var n: int = clampi(int(amount / 2) + randi_range(0, 3), 6, 25)

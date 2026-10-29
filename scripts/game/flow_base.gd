@@ -683,9 +683,10 @@ func _update_title_stats(events: Array, state: Dictionary) -> void:
 			log_lines.append({"p": int(pid), "t": " 获得称号 ", "t2": "「%s」" % str(t.get("name", "")),
 				"kc": col, "t3": "（%s）" % TitleDefsRef.tier_name(tier), "kc3": col})
 			# 棋子顶部浮字（上浮淡出）——只记棋子身份，坐标在 tick 里按当前布局算
-			title_floats.append({"text": str(t.get("name", "")), "tier": tier,
-				"pid": int(pid), "ci": _title_piece_ci(int(pid), events), "t": 0.0,
-				"pos": Vector2.ZERO})
+			if not settings_reduce_motion:
+				title_floats.append({"text": str(t.get("name", "")), "tier": tier,
+					"pid": int(pid), "ci": _title_piece_ci(int(pid), events), "t": 0.0,
+					"pos": Vector2.ZERO})
 			new_ids.append(str(t.get("id", "")))
 		# 只有本机玩家才计入称号图鉴；AI/其他玩家仅播报
 		if int(pid) == local_pid and not new_ids.is_empty(): TitleStoreRef.bump(new_ids)
@@ -962,7 +963,7 @@ func _tick_setup_screen(delta: float) -> void:
 func _tick_anim_fx(delta: float) -> void:
 	# #3b 弹窗打开时立刻冻结动画（原来 _anim_step 在门之前，导致点按钮后棋子还在动）
 	if not (rules_open or show_result or local_paused):
-		_anim_step(delta * anim_speed)   # ★ 必须在冻结门【之内】：M3 联机追赶用倍速（默认 1.0）
+		_anim_step(delta * anim_speed * _settings_anim_scale())   # 用户动画速度 × 联机追赶倍速
 		if screen == Scr.PLAY: _tick_energy(delta)
 		# 道具栏反馈动画：成功 0.62s（闪白+对勾+飘字）、失败 0.30s（抖动）
 		item_pulse_t += delta

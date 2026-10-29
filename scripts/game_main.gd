@@ -65,6 +65,9 @@ func _ready() -> void:
 			ap.stream = stm
 			add_child(ap)
 			sfx[nm] = ap
+	# 读取本地设置并应用到音效/音乐/震动/动画/提示（设置页之后可即时更新）
+	_settings_load()
+	_settings_apply()
 	# 配色对齐 theme.css（PALETTE.blue 原为自创的 #a8c9e8，项目是 --player-3-color #afccea）
 	# 骰子专用高饱和色（项目 theme.css:26-29 --player-N-dice，与棋子用的 --player-N-color 是两套）
 	DICE_COLS = {1: Color("#35ae61"), 2: Color("#dd7022"), 3: Color("#4777c5"), 4: Color("#fc6666")}
@@ -204,16 +207,17 @@ func _process(delta: float) -> void:
 	if screen == Scr.MODE: queue_redraw()
 	if _tick_shot(delta): return
 	_tick_net(delta)          # M4：联机会话/发现/客户端收包（单机时内部全为 no-op）
-	_tick_dice_anim(delta)
-	_tick_headings(delta)
+	var adt: float = delta * _settings_anim_scale()
+	_tick_dice_anim(adt)
+	_tick_headings(adt)
 	_tick_transition(delta)
 	_tick_setup_screen(delta)
 	_tick_anim_fx(delta)
 	_tick_hud_sync()
 	_tick_particles_fx(delta)
 	_tick_item_hold(delta)
-	_tick_dice_fx(delta)
-	_tick_title_floats(delta)
+	_tick_dice_fx(adt)
+	_tick_title_floats(adt)
 	# ★ 不在对局中就什么都不做（st 还是空字典），或动画没播完 -> AI 和输入都等（H2）
 	# ★ 结算弹窗打开时暂停整局（否则后面的 AI 还在继续走）
 	if screen != Scr.PLAY or show_result or rules_open or local_paused or not seq.is_empty(): return
